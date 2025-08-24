@@ -1,73 +1,82 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>LLM語言翻譯</title>
+    <meta charset="UTF-8">
+    <title>LLM Translator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- 懸浮設定切換鈕（左側圖示顯示測試結果） -->
-    <button id="settings-toggle" class="settings-toggle" aria-expanded="false" aria-controls="settings-panel" title="開啟/關閉設定（Ollama 網址與模型）">
-        <span id="settings-indicator" class="settings-indicator" aria-hidden="true">⏳</span>
-        ⚙️ 設定
-    </button>
-    <!-- 懸浮設定面板 -->
-    <section id="settings-panel" class="settings-panel" role="dialog" aria-modal="false" aria-labelledby="settings-heading">
-        <div class="settings-title">
-            <h3 id="settings-heading">連線與模型設定</h3>
-            <button class="close-x" id="settings-close" aria-label="關閉設定">×</button>
-        </div>
-        <div class="settings-inner">
-            <div class="settings-row">
-                <label for="ollama-url">Ollama API 網址（範例： http://localhost:11434 ）</label>
-                <div class="url-group">
-                    <input type="text" id="ollama-url" value="http://localhost:11434" inputmode="url" placeholder="http://localhost:11434"/>
-                    <button id="validate-btn" type="button">驗證連線</button>
-                    <span id="connection-status" class="status" aria-live="polite" title="連線狀態"></span>
-                </div>
-            </div>
-            <div class="settings-row">
-                <label for="model-select">選擇模型</label>
-                <div class="model-group">
-                    <select id="model-select" aria-label="模型清單">
-                        <option value="">載入中...</option>
-                    </select>
-                    <button id="refresh-models" type="button">重新整理</button>
-                </div>
-            </div>
-        </div>
-    </section>
-    <div class="app" aria-live="polite">
-        <header class="topbar">
-            <div class="title">LLM語言翻譯</div>
-            <select id="source-lang" aria-label="來源語言">
-                <option value="auto">自動偵測</option>
-                <option value="en">英文</option>
-                <option value="zh-TW">中文（繁體）</option>
-                <option value="zh-CN">中文（簡體）</option>
-                <option value="ja">日文</option>
+<div class="app">
+    <div class="topbar">
+        <span class="title">LLM Translator</span>
+        <label for="lang-switch" style="margin-left:auto;font-size:14px;">
+            🌐
+            <select id="lang-switch" style="font-size:14px;">
+                <option value="zh-TW">繁體中文</option>
+                <option value="en">English</option>
             </select>
-            <button class="swap-btn" id="swap-btn" title="交換語言">↔</button>
-            <select id="target-lang" aria-label="目標語言">
-                <option value="en">英文</option>
-                <option value="zh-TW" selected>中文（繁體）</option>
-                <option value="zh-CN">中文（簡體）</option>
-                <option value="ja">日文</option>
-            </select>
-        </header>
-        <main class="workarea">
-            <section class="pane input">
-                <textarea id="input-text" class="box input" placeholder="輸入文字..." aria-label="輸入文字"></textarea>
-            </section>
-            <div class="mid">
-                <button class="translate-btn" id="translate-btn" title="執行翻譯">翻譯</button>
-            </div>
-            <section class="pane output">
-                <textarea id="output-text" class="box output" placeholder="翻譯結果..." readonly aria-label="翻譯結果"></textarea>
-            </section>
-        </main>
+        </label>
     </div>
-    <script src="app.js"></script>
+    <div class="workarea">
+        <div class="pane input">
+            <textarea id="input-text" class="box" rows="8" placeholder="請輸入要翻譯的文字..."></textarea>
+            <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
+                <label for="source-lang" style="font-size:14px;">來源語言 / Source Language</label>
+                <select id="source-lang" style="font-size:14px;">
+                    <option value="auto">自動偵測</option>
+                    <option value="en">英文</option>
+                    <option value="zh-TW">繁體中文</option>
+                    <option value="zh-CN">簡體中文</option>
+                    <option value="ja">日文</option>
+                </select>
+            </div>
+        </div>
+        <div class="mid">
+            <button id="swap-btn" class="swap-btn" title="交換語言 / Swap Languages">⇄</button>
+            <button id="translate-btn" class="translate-btn">翻譯</button>
+        </div>
+        <div class="pane output">
+            <textarea id="output-text" class="box output" rows="8" readonly placeholder="翻譯結果將顯示於此"></textarea>
+            <div style="margin-top:10px;display:flex;align-items:center;gap:10px;">
+                <label for="target-lang" style="font-size:14px;">目標語言 / Target Language</label>
+                <select id="target-lang" style="font-size:14px;">
+                    <option value="en">英文</option>
+                    <option value="zh-TW">繁體中文</option>
+                    <option value="zh-CN">簡體中文</option>
+                    <option value="ja">日文</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    <button id="settings-toggle" class="settings-toggle" aria-expanded="false">
+        <span id="settings-indicator">⏳</span>
+        <span>設定 / Settings</span>
+    </button>
+    <div id="settings-panel" class="settings-panel">
+        <div class="settings-inner">
+            <div class="settings-title" id="settings-title">
+                <h3 id="settings-title-text">設定 / Settings</h3>
+                <button id="settings-close" class="close-x" title="關閉 / Close">×</button>
+            </div>
+            <div class="settings-row">
+                <label id="ollama-url-label" for="ollama-url">Ollama 連線網址 / Ollama URL</label>
+                <div class="url-group">
+                    <input type="text" id="ollama-url" placeholder="http://localhost:11434" style="width:100%">
+                    <button id="validate-btn">測試連線 / Test Connection</button>
+                    <span id="connection-status" class="status"></span>
+                </div>
+            </div>
+            <div class="settings-row">
+                <label id="model-select-label" for="model-select">選擇模型 / Model</label>
+                <div class="model-group">
+                    <select id="model-select"></select>
+                    <button id="refresh-models">重新載入模型 / Reload Models</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="app.js"></script>
 </body>
 </html>
