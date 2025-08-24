@@ -106,6 +106,20 @@ function applyTranslations(){
     validateBtn.textContent = t.validate;
     refreshModelsBtn.textContent = t.refreshModels;
 
+    // 若目前模型下拉僅顯示單一狀態選項，依語系調整文字
+    if (modelSelect && modelSelect.options.length > 0 && modelSelect.options[0].value === '') {
+        const opt = modelSelect.options[0];
+        const zh = translations['zh-TW'];
+        const en = translations['en'];
+        if (opt.textContent === zh.loadingModels || opt.textContent === en.loadingModels) {
+            opt.textContent = t.loadingModels;
+        } else if (opt.textContent === zh.loadModelsFailed || opt.textContent === en.loadModelsFailed) {
+            opt.textContent = t.loadModelsFailed;
+        } else if (opt.textContent === zh.noModels || opt.textContent === en.noModels) {
+            opt.textContent = t.noModels;
+        }
+    }
+
     if(uiLangSelect){
         uiLangSelect.value = currentLang;
         const optZh = uiLangSelect.querySelector("option[value='zh-TW']");
