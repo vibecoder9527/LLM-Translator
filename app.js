@@ -11,12 +11,15 @@ const translations = {
         validate: '測試連線',
         modelSelect: '選擇模型',
         refreshModels: '重新載入模型',
+        uiLang: '介面語言',
+        testing: '測試中...',
         connectionSuccess: '連線成功',
         connectionFail: '連線失敗',
         selectModel: '請選擇模型',
         inputRequired: '請輸入文字',
         noModels: '無模型可用',
         loadingModels: '載入中...',
+        loadModelsFailed: '無法載入模型',
         translationFailed: '翻譯失敗：',
         error: '錯誤：',
         auto: '自動偵測',
@@ -35,12 +38,15 @@ const translations = {
         validate: 'Test Connection',
         modelSelect: 'Model',
         refreshModels: 'Reload Models',
+        uiLang: 'Interface Language',
+        testing: 'Testing...',
         connectionSuccess: 'Connected',
         connectionFail: 'Connection Failed',
         selectModel: 'Please select a model',
         inputRequired: 'Please enter text',
         noModels: 'No models available',
         loadingModels: 'Loading...',
+        loadModelsFailed: 'Unable to load models',
         translationFailed: 'Translation failed: ',
         error: 'Error: ',
         auto: 'Auto Detect',
@@ -50,6 +56,8 @@ const translations = {
         ja: 'Japanese'
     }
 };
+
+let currentLang = localStorage.getItem('uiLang') || (navigator.language.startsWith('zh') ? 'zh-TW' : 'en');
 
 // 取得元素
 const settingsToggle = document.getElementById('settings-toggle');
@@ -61,10 +69,81 @@ const modelSelect      = document.getElementById('model-select');
 const validateBtn      = document.getElementById('validate-btn');
 const connectionStatus = document.getElementById('connection-status');
 const refreshModelsBtn = document.getElementById('refresh-models');
+const uiLangSelect     = document.getElementById('ui-lang');
 
 const swapBtn       = document.getElementById('swap-btn');
 const translateBtn  = document.getElementById('translate-btn');
 const settingsIndicator = document.getElementById('settings-indicator');
+const settingsLabel     = document.getElementById('settings-label');
+
+function applyTranslations(){
+    const t = translations[currentLang] || translations['en'];
+    document.documentElement.lang = currentLang;
+
+    // UI elements
+    document.getElementById('input-text').placeholder = t.inputPlaceholder;
+    document.getElementById('output-text').placeholder = t.outputPlaceholder;
+    translateBtn.textContent = t.translateBtn;
+    swapBtn.title = t.swapBtn;
+
+    if(settingsLabel){
+        settingsLabel.textContent = `⚙️ ${t.settingsTitle}`;
+    }
+    settingsToggle.title = t.settingsTitle;
+
+    const heading = document.getElementById('settings-heading');
+    if(heading) heading.textContent = t.settingsTitle;
+
+    const labelUrl = document.querySelector("label[for='ollama-url']");
+    if(labelUrl) labelUrl.textContent = t.ollamaUrl;
+
+    const labelModel = document.querySelector("label[for='model-select']");
+    if(labelModel) labelModel.textContent = t.modelSelect;
+
+    const uiLangLabel = document.getElementById('ui-lang-label');
+    if(uiLangLabel) uiLangLabel.textContent = t.uiLang;
+
+    validateBtn.textContent = t.validate;
+    refreshModelsBtn.textContent = t.refreshModels;
+
+    if(uiLangSelect){
+        uiLangSelect.value = currentLang;
+        const optZh = uiLangSelect.querySelector("option[value='zh-TW']");
+        const optEn = uiLangSelect.querySelector("option[value='en']");
+        if(optZh) optZh.textContent = t['zh-TW'];
+        if(optEn) optEn.textContent = t.en;
+    }
+
+    const srcSel = document.getElementById('source-lang');
+    if(srcSel){
+        srcSel.querySelector("option[value='auto']").textContent = t.auto;
+        srcSel.querySelector("option[value='en']").textContent = t.en;
+        srcSel.querySelector("option[value='zh-TW']").textContent = t['zh-TW'];
+        srcSel.querySelector("option[value='zh-CN']").textContent = t['zh-CN'];
+        srcSel.querySelector("option[value='ja']").textContent = t.ja;
+    }
+
+    const tgtSel = document.getElementById('target-lang');
+    if(tgtSel){
+        tgtSel.querySelector("option[value='en']").textContent = t.en;
+        tgtSel.querySelector("option[value='zh-TW']").textContent = t['zh-TW'];
+        tgtSel.querySelector("option[value='zh-CN']").textContent = t['zh-CN'];
+        tgtSel.querySelector("option[value='ja']").textContent = t.ja;
+    }
+
+    if(connectionStatus.classList.contains('success')){
+        connectionStatus.textContent = '✅ ' + t.connectionSuccess;
+    }else if(connectionStatus.classList.contains('failure')){
+        connectionStatus.textContent = '❌ ' + t.connectionFail;
+    }
+}
+
+function setLanguage(lang){
+    if(!translations[lang]) return;
+    currentLang = lang;
+    localStorage.setItem('uiLang', lang);
+    applyTranslations();
+}
 
 // —— 移除模型「思考區塊」——
 function stripHiddenReasoning(text) {
@@ -101,30 +180,32 @@ window.addEventListener('keydown', (e)=>{
 
 // ===== 指示圖示狀態 =====
 function setSettingsIndicator(state){
+    const t = translations[currentLang];
     if(state === 'testing'){
         settingsIndicator.textContent = '⏳';
-        settingsIndicator.title = '測試中…';
+        settingsIndicator.title = t.testing;
     }else if(state === 'ok'){
         settingsIndicator.textContent = '✅';
-        settingsIndicator.title = '連線成功';
+        settingsIndicator.title = t.connectionSuccess;
     }else if(state === 'fail'){
         settingsIndicator.textContent = '❌';
-        settingsIndicator.title = '連線失敗';
+        settingsIndicator.title = t.connectionFail;
     }
 }
 
 // ===== 連線測試（可選擇是否載入模型清單）=====
 async function testConnectionAndMaybeLoadModels({loadList=false} = {}){
+    const t = translations[currentLang];
     const baseUrl = ollamaUrlInput.value.trim().replace(/\/+$/, '') + '/api/tags';
     setSettingsIndicator('testing');
     if (loadList){
-        modelSelect.innerHTML = '<option value="">載入中...</option>';
+        modelSelect.innerHTML = `<option value="">${t.loadingModels}</option>`;
         connectionStatus.textContent = '';
         connectionStatus.className = 'status';
     }
     try{
         const resp = await fetch(baseUrl);
-        if(!resp.ok) throw new Error('狀態碼非200');
+        if(!resp.ok) throw new Error('status code not 200');
         const data = await resp.json();
 
         setSettingsIndicator('ok');
@@ -144,21 +225,21 @@ async function testConnectionAndMaybeLoadModels({loadList=false} = {}){
                 } else if (modelSelect.options.length>0){
                     modelSelect.value = modelSelect.options[0].value;
                 }
-                connectionStatus.textContent = '✅';
+                connectionStatus.textContent = '✅ ' + t.connectionSuccess;
                 connectionStatus.className = 'status success';
             } else {
-                modelSelect.innerHTML = '<option value="">無模型可用</option>';
-                connectionStatus.textContent = '❌';
+                modelSelect.innerHTML = `<option value="">${t.noModels}</option>`;
+                connectionStatus.textContent = '❌ ' + t.connectionFail;
                 connectionStatus.className = 'status failure';
             }
         }
         return true;
     }catch(err){
-        console.error('連線測試失敗：', err);
+        console.error(t.connectionFail, err);
         setSettingsIndicator('fail');
         if(loadList){
-            modelSelect.innerHTML = '<option value="">無法載入模型</option>';
-            connectionStatus.textContent = '❌';
+            modelSelect.innerHTML = `<option value="">${t.loadModelsFailed}</option>`;
+            connectionStatus.textContent = '❌ ' + t.connectionFail;
             connectionStatus.className = 'status failure';
         }
         return false;
@@ -202,8 +283,14 @@ refreshModelsBtn.addEventListener('click', async () => {
 // 模型選擇變更時儲存
 modelSelect.addEventListener('change', saveSettings);
 
+// 介面語言切換
+if(uiLangSelect){
+    uiLangSelect.addEventListener('change', () => setLanguage(uiLangSelect.value));
+}
+
 // 初始
 loadSettings();
+applyTranslations();
 
 // 語言交換
 function swapLanguages() {
@@ -217,6 +304,7 @@ swapBtn.addEventListener('click', swapLanguages);
 
 // 翻譯主流程
 async function translateText() {
+    const t = translations[currentLang];
     const input  = document.getElementById('input-text').value;
     const source = document.getElementById('source-lang').value;
     const target = document.getElementById('target-lang').value;
@@ -224,9 +312,9 @@ async function translateText() {
     const ollamaUrl = base + '/api/generate';
     const selectedModel = modelSelect.value;
 
-    if (!input) { alert('請輸入文字'); return; }
+    if (!input) { alert(t.inputRequired); return; }
     if (!selectedModel) {
-        alert('請選擇模型');
+        alert(t.selectModel);
         modelSelect.focus();
         openSettings();
         return;
@@ -262,10 +350,10 @@ async function translateText() {
             const cleaned = stripHiddenReasoning(data.response);
             document.getElementById('output-text').value = cleaned || '';
         } else {
-            document.getElementById('output-text').value = '翻譯失敗：' + JSON.stringify(data);
+            document.getElementById('output-text').value = t.translationFailed + JSON.stringify(data);
         }
     } catch (error) {
-        document.getElementById('output-text').value = '錯誤：' + error.message;
+        document.getElementById('output-text').value = t.error + error.message;
     }
 }
 translateBtn.addEventListener('click', translateText);
