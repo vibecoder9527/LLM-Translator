@@ -51,60 +51,7 @@ const translations = {
     }
 };
 
-function getBrowserLocale() {
-    // 取得瀏覽器語系 // Get browser language
-    const lang = navigator.language || navigator.userLanguage;
-    if (lang.startsWith('zh-TW')) return 'zh-TW';
-    if (lang.startsWith('zh-CN')) return 'zh-TW'; // 可自行擴充
-    if (lang.startsWith('ja'))    return 'ja';
-    return 'en';
-}
-
-let currentLang = localStorage.getItem('i18nLang') || getBrowserLocale();
-if (!translations[currentLang]) currentLang = 'en';
-
-// ===== 應用語系至 UI元件（Apply i18n to UI）===== 
-function applyI18n() {
-    const t = translations[currentLang];
-    document.getElementById('input-text').placeholder   = t.inputPlaceholder;
-    document.getElementById('output-text').placeholder  = t.outputPlaceholder;
-    document.getElementById('translate-btn').textContent = t.translateBtn;
-    document.getElementById('swap-btn').title = t.swapBtn;
-    document.getElementById('settings-title-text').textContent = t.settingsTitle;
-    document.getElementById('ollama-url-label').textContent = t.ollamaUrl;
-    document.getElementById('validate-btn').textContent = t.validate;
-    document.getElementById('model-select-label').textContent = t.modelSelect;
-    document.getElementById('refresh-models').textContent = t.refreshModels;
-
-    // 語言選單 // Language dropdowns
-    const langOpts = [
-        {value:'auto', label:t.auto},
-        {value:'en', label:t.en},
-        {value:'zh-TW', label:t['zh-TW']},
-        {value:'zh-CN', label:t['zh-CN']},
-        {value:'ja', label:t.ja}
-    ];
-    ['source-lang','target-lang'].forEach(id=>{
-        const sel = document.getElementById(id);
-        sel.innerHTML = '';
-        langOpts.forEach(opt=>{
-            const el = document.createElement('option');
-            el.value = opt.value;
-            el.textContent = opt.label;
-            sel.appendChild(el);
-        });
-    });
-}
-
-// 語系切換按鈕 // Language switcher button
-document.getElementById('lang-switch').addEventListener('change', e=>{
-    currentLang = e.target.value;
-    localStorage.setItem('i18nLang', currentLang);
-    applyI18n();
-});
-applyI18n();
-
-// 取得元素 // Get DOM elements
+// 取得元素
 const settingsToggle = document.getElementById('settings-toggle');
 const settingsPanel  = document.getElementById('settings-panel');
 const settingsClose  = document.getElementById('settings-close');
@@ -119,7 +66,7 @@ const swapBtn       = document.getElementById('swap-btn');
 const translateBtn  = document.getElementById('translate-btn');
 const settingsIndicator = document.getElementById('settings-indicator');
 
-// —— 移除模型「思考區塊」—— // Remove model's <think> block
+// —— 移除模型「思考區塊」——
 function stripHiddenReasoning(text) {
     if (!text) return '';
     text = text.replace(/<\s*think[^>]*>[\s\S]*?<\s*\/\s*think\s*>/gi, '');
@@ -128,7 +75,7 @@ function stripHiddenReasoning(text) {
     return text.trim();
 }
 
-/* ===== 懸浮面板：開合邏輯 ===== // Floating panel open/close logic */
+/* ===== 懸浮面板：開合邏輯 ===== */
 function openSettings(){
     settingsPanel.classList.add('open');
     settingsToggle.setAttribute('aria-expanded','true');
@@ -144,7 +91,7 @@ function toggleSettings(){
 settingsToggle.addEventListener('click', toggleSettings);
 settingsClose.addEventListener('click', closeSettings);
 document.addEventListener('click', (e)=>{
-    if(!settingsPanel.contains(e.target) && !settingsToggle.contains(e.target)){ 
+    if(!settingsPanel.contains(e.target) && !settingsToggle.contains(e.target)){
         if(settingsPanel.classList.contains('open')) closeSettings();
     }
 });
@@ -152,32 +99,32 @@ window.addEventListener('keydown', (e)=>{
     if(e.key === 'Escape' && settingsPanel.classList.contains('open')) closeSettings();
 });
 
-// ===== 指示圖示狀態 ===== // Status indicator
+// ===== 指示圖示狀態 =====
 function setSettingsIndicator(state){
-    if(state === 'testing'){ 
+    if(state === 'testing'){
         settingsIndicator.textContent = '⏳';
-        settingsIndicator.title = 'Testing...';
-    }else if(state === 'ok'){ 
+        settingsIndicator.title = '測試中…';
+    }else if(state === 'ok'){
         settingsIndicator.textContent = '✅';
-        settingsIndicator.title = translations[currentLang].connectionSuccess;
-    }else if(state === 'fail'){ 
+        settingsIndicator.title = '連線成功';
+    }else if(state === 'fail'){
         settingsIndicator.textContent = '❌';
-        settingsIndicator.title = translations[currentLang].connectionFail;
+        settingsIndicator.title = '連線失敗';
     }
 }
 
-// ===== 連線測試（可選擇是否載入模型清單）=====// Test connection, optionally load model list
+// ===== 連線測試（可選擇是否載入模型清單）=====
 async function testConnectionAndMaybeLoadModels({loadList=false} = {}){
-    const baseUrl = ollamaUrlInput.value.trim().replace(/\/\/+$/'') + '/api/tags';
+    const baseUrl = ollamaUrlInput.value.trim().replace(/\/+$/, '') + '/api/tags';
     setSettingsIndicator('testing');
     if (loadList){
-        modelSelect.innerHTML = `<option value=''>${translations[currentLang].loadingModels}</option>`;
+        modelSelect.innerHTML = '<option value="">載入中...</option>';
         connectionStatus.textContent = '';
         connectionStatus.className = 'status';
     }
     try{
         const resp = await fetch(baseUrl);
-        if(!resp.ok) throw new Error('status not 200');
+        if(!resp.ok) throw new Error('狀態碼非200');
         const data = await resp.json();
 
         setSettingsIndicator('ok');
@@ -200,17 +147,17 @@ async function testConnectionAndMaybeLoadModels({loadList=false} = {}){
                 connectionStatus.textContent = '✅';
                 connectionStatus.className = 'status success';
             } else {
-                modelSelect.innerHTML = `<option value=''>${translations[currentLang].noModels}</option>`;
+                modelSelect.innerHTML = '<option value="">無模型可用</option>';
                 connectionStatus.textContent = '❌';
                 connectionStatus.className = 'status failure';
             }
         }
         return true;
     }catch(err){
-        console.error('Connection test failed:', err); // 連線測試失敗
+        console.error('連線測試失敗：', err);
         setSettingsIndicator('fail');
         if(loadList){
-            modelSelect.innerHTML = `<option value=''>${translations[currentLang].noModels}</option>`;
+            modelSelect.innerHTML = '<option value="">無法載入模型</option>';
             connectionStatus.textContent = '❌';
             connectionStatus.className = 'status failure';
         }
@@ -218,41 +165,47 @@ async function testConnectionAndMaybeLoadModels({loadList=false} = {}){
     }
 }
 
-// ===== 載入記憶設定 + 首次自動測試連線並載入模型 =====// Load saved settings & auto test connection/load models
+// ===== 載入記憶設定 + 首次自動測試連線並載入模型 =====
 function loadSettings() {
     const savedUrl   = localStorage.getItem('ollamaUrl');
     const savedModel = localStorage.getItem('selectedModel');
     if (savedUrl) ollamaUrlInput.value = savedUrl;
 
+    // 第一次載入：做一次連線測試 + 取得模型，並更新圖示
     testConnectionAndMaybeLoadModels({loadList:true}).then(ok=>{
-        if(ok && savedModel && [...modelSelect.options].some(opt=>opt.value===savedModel)){ 
+        if(ok && savedModel && [...modelSelect.options].some(opt=>opt.value===savedModel)){
             modelSelect.value = savedModel;
         }
     });
 }
 
-// 儲存設定 // Save settings
+// 儲存設定
 function saveSettings() {
     localStorage.setItem('ollamaUrl', ollamaUrlInput.value.trim());
     localStorage.setItem('selectedModel', modelSelect.value);
 }
 
+// 事件：API 網址改變時儲存
 ollamaUrlInput.addEventListener('change', saveSettings);
 
+// 手動「驗證連線」→ 測試並載入模型 + 更新兩處狀態（面板與按鈕圖示）
 validateBtn.addEventListener('click', async () => {
     await testConnectionAndMaybeLoadModels({loadList:true});
     saveSettings();
 });
 
+// 手動「重新整理」→ 也做測試（避免 URL 已換）
 refreshModelsBtn.addEventListener('click', async () => {
     await testConnectionAndMaybeLoadModels({loadList:true});
 });
 
+// 模型選擇變更時儲存
 modelSelect.addEventListener('change', saveSettings);
 
+// 初始
 loadSettings();
 
-// 語言交換 // Swap languages
+// 語言交換
 function swapLanguages() {
     const sourceSel = document.getElementById('source-lang');
     const targetSel = document.getElementById('target-lang');
@@ -262,32 +215,32 @@ function swapLanguages() {
 }
 swapBtn.addEventListener('click', swapLanguages);
 
-// 翻譯主流程 // Main translation process
+// 翻譯主流程
 async function translateText() {
     const input  = document.getElementById('input-text').value;
     const source = document.getElementById('source-lang').value;
     const target = document.getElementById('target-lang').value;
-    const base   = ollamaUrlInput.value.trim().replace(/\/\/+$/'') + '/api/generate';
+    const base   = ollamaUrlInput.value.trim().replace(/\/+$/, '');
+    const ollamaUrl = base + '/api/generate';
     const selectedModel = modelSelect.value;
-    const t = translations[currentLang];
 
-    if (!input) { alert(t.inputRequired); return; }
+    if (!input) { alert('請輸入文字'); return; }
     if (!selectedModel) {
-        alert(t.selectModel);
+        alert('請選擇模型');
         modelSelect.focus();
         openSettings();
         return;
     }
 
     const langMap = {
-        'auto': t.auto,
-        'en': t.en,
-        'zh-TW': t['zh-TW'],
-        'zh-CN': t['zh-CN'],
-        'ja': t.ja
+        'auto': 'auto-detect',
+        'en': 'English',
+        'zh-TW': 'Traditional Chinese',
+        'zh-CN': 'Simplified Chinese',
+        'ja': 'Japanese',
     };
-    const sourceName = langMap[source] || t.auto;
-    const targetName = langMap[target] || t.en;
+    const sourceName = langMap[source] || 'auto-detect';
+    const targetName = langMap[target] || 'English';
 
     const prompt = `Translate the following text from ${sourceName} to ${targetName}: ${input}. Output ONLY the translated text with no explanations, no quotes, no markdown fences.`;
 
@@ -309,10 +262,10 @@ async function translateText() {
             const cleaned = stripHiddenReasoning(data.response);
             document.getElementById('output-text').value = cleaned || '';
         } else {
-            document.getElementById('output-text').value = t.translationFailed + JSON.stringify(data);
+            document.getElementById('output-text').value = '翻譯失敗：' + JSON.stringify(data);
         }
     } catch (error) {
-        document.getElementById('output-text').value = t.error + error.message;
+        document.getElementById('output-text').value = '錯誤：' + error.message;
     }
 }
 translateBtn.addEventListener('click', translateText);
