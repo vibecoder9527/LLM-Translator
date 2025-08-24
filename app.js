@@ -6,6 +6,7 @@ const translations = {
         outputPlaceholder: '翻譯結果將顯示於此',
         translateBtn: '翻譯',
         swapBtn: '交換語言',
+        appTitle: 'LLM語言翻譯',
         settingsTitle: '設定',
         ollamaUrl: 'Ollama 連線網址',
         validate: '測試連線',
@@ -33,6 +34,7 @@ const translations = {
         outputPlaceholder: 'Translation result will appear here',
         translateBtn: 'Translate',
         swapBtn: 'Swap Languages',
+        appTitle: 'LLM Translator',
         settingsTitle: 'Settings',
         ollamaUrl: 'Ollama URL',
         validate: 'Test Connection',
@@ -79,6 +81,10 @@ const settingsLabel     = document.getElementById('settings-label');
 function applyTranslations(){
     const t = translations[currentLang] || translations['en'];
     document.documentElement.lang = currentLang;
+
+    const titleEl = document.getElementById('app-title');
+    if(titleEl) titleEl.textContent = t.appTitle;
+    document.title = t.appTitle;
 
     // UI elements
     document.getElementById('input-text').placeholder = t.inputPlaceholder;
