@@ -59,7 +59,23 @@ const translations = {
     }
 };
 
-let currentLang = localStorage.getItem('uiLang') || (navigator.language.startsWith('zh') ? 'zh-TW' : 'en');
+// 首次載入時偵測瀏覽器語言，若 i18n 不支援則使用英文
+function detectBrowserLanguage(){
+    const navLangs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
+    for(const lang of navLangs){
+        if(translations[lang]) return lang;
+        const base = lang.split('-')[0];
+        const match = Object.keys(translations).find(l => l.split('-')[0] === base);
+        if(match) return match;
+    }
+    return 'en';
+}
+
+let currentLang = localStorage.getItem('uiLang');
+if(!currentLang){
+    currentLang = detectBrowserLanguage();
+    localStorage.setItem('uiLang', currentLang);
+}
 
 // 取得元素
 const settingsToggle = document.getElementById('settings-toggle');
