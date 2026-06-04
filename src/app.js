@@ -27,7 +27,15 @@ const translations = {
         en: '英文',
         'zh-TW': '繁體中文',
         'zh-CN': '簡體中文',
-        ja: '日文'
+        ja: '日文',
+        provider: 'API 提供者',
+        providerOllama: 'Ollama（原生）',
+        providerOpenAI: 'OpenAI 相容',
+        apiUrl: 'API Base URL（Ollama 範例：http://localhost:11434；OpenAI 範例：http://localhost:1234/v1）',
+        streamMode: '串流輸出',
+        interrupt: '中斷',
+        confirmInterrupt: '確認要中斷翻譯嗎？',
+        aborted: '（已中斷）'
     },
     'en': {
         inputPlaceholder: 'Enter text to translate...',
@@ -55,7 +63,15 @@ const translations = {
         en: 'English',
         'zh-TW': 'Traditional Chinese',
         'zh-CN': 'Simplified Chinese',
-        ja: 'Japanese'
+        ja: 'Japanese',
+        provider: 'API Provider',
+        providerOllama: 'Ollama (native)',
+        providerOpenAI: 'OpenAI Compatible',
+        apiUrl: 'API Base URL (Ollama e.g. http://localhost:11434; OpenAI e.g. http://localhost:1234/v1)',
+        streamMode: 'Stream output',
+        interrupt: 'Interrupt',
+        confirmInterrupt: 'Confirm to interrupt translation?',
+        aborted: ' (aborted)'
     }
 };
 
@@ -83,6 +99,7 @@ const settingsPanel  = document.getElementById('settings-panel');
 const settingsClose  = document.getElementById('settings-close');
 
 const ollamaUrlInput   = document.getElementById('ollama-url');
+const providerSelect   = document.getElementById('provider');
 const modelSelect      = document.getElementById('model-select');
 const validateBtn      = document.getElementById('validate-btn');
 const connectionStatus = document.getElementById('connection-status');
@@ -91,8 +108,11 @@ const uiLangSelect     = document.getElementById('ui-lang');
 
 const swapBtn       = document.getElementById('swap-btn');
 const translateBtn  = document.getElementById('translate-btn');
+const streamModeChk = document.getElementById('stream-mode');
 const settingsIndicator = document.getElementById('settings-indicator');
 const settingsLabel     = document.getElementById('settings-label');
+
+let currentAbortController = null;
 
 function applyTranslations(){
     const t = translations[currentLang] || translations['en'];
@@ -105,7 +125,9 @@ function applyTranslations(){
     // UI elements
     document.getElementById('input-text').placeholder = t.inputPlaceholder;
     document.getElementById('output-text').placeholder = t.outputPlaceholder;
-    translateBtn.textContent = t.translateBtn;
+    if(translateBtn && !translateBtn.classList.contains('interrupt')){
+        translateBtn.textContent = t.translateBtn;
+    }
     swapBtn.title = t.swapBtn;
 
     if(settingsLabel){
@@ -116,14 +138,27 @@ function applyTranslations(){
     const heading = document.getElementById('settings-heading');
     if(heading) heading.textContent = t.settingsTitle;
 
-    const labelUrl = document.querySelector("label[for='ollama-url']");
-    if(labelUrl) labelUrl.textContent = t.ollamaUrl;
+    const labelUrl = document.getElementById('api-url-label');
+    if(labelUrl) labelUrl.textContent = t.apiUrl;
 
     const labelModel = document.querySelector("label[for='model-select']");
     if(labelModel) labelModel.textContent = t.modelSelect;
 
     const uiLangLabel = document.getElementById('ui-lang-label');
     if(uiLangLabel) uiLangLabel.textContent = t.uiLang;
+
+    const providerLabel = document.getElementById('provider-label');
+    if(providerLabel) providerLabel.textContent = t.provider;
+
+    if(providerSelect){
+        const optO = providerSelect.querySelector("option[value='ollama']");
+        const optA = providerSelect.querySelector("option[value='openai']");
+        if(optO) optO.textContent = t.providerOllama;
+        if(optA) optA.textContent = t.providerOpenAI;
+    }
+
+    const streamLabel = document.getElementById('stream-label-text');
+    if(streamLabel) streamLabel.textContent = t.streamMode;
 
     validateBtn.textContent = t.validate;
     refreshModelsBtn.textContent = t.refreshModels;
@@ -190,7 +225,12 @@ function stripHiddenReasoning(text) {
     return text.trim();
 }
 
-/* ===== 懸浮面板：開合邏輯 ===== */
+function getProvider(){ return (providerSelect && providerSelect.value) || 'ollama'; }
+function getBaseUrl(){ return ollamaUrlInput.value.trim().replace(/\/+$/, ''); }
+function getModelsEndpoint(){ const base = getBaseUrl(); return getProvider()==='ollama' ? base + '/api/tags' : base + '/models'; }
+function getChatEndpoint(){ const base = getBaseUrl(); return getProvider()==='ollama' ? base + '/api/generate' : base + '/chat/completions'; }
+function setButtonTranslating(translating){ const t = translations[currentLang] || translations['en']; if(translating){ translateBtn.textContent = t.interrupt; translateBtn.classList.add('interrupt'); }else{ translateBtn.textContent = t.translateBtn; translateBtn.classList.remove('interrupt'); } }
+function extractResponse(data, prov){ if(prov==='ollama') return (data && typeof data.response === 'string') ? data.response : ''; if(data && data.choices && data.choices[0] && data.choices[0].message && typeof data.choices[0].message.content === 'string') return data.choices[0].message.content; return ''; }
 function openSettings(){
     settingsPanel.classList.add('open');
     settingsToggle.setAttribute('aria-expanded','true');
@@ -232,7 +272,7 @@ function setSettingsIndicator(state){
 // ===== 連線測試（可選擇是否載入模型清單）=====
 async function testConnectionAndMaybeLoadModels({loadList=false} = {}){
     const t = translations[currentLang];
-    const baseUrl = ollamaUrlInput.value.trim().replace(/\/+$/, '') + '/api/tags';
+    const baseUrl = getModelsEndpoint();
     setSettingsIndicator('testing');
     if (loadList){
         modelSelect.innerHTML = `<option value="">${t.loadingModels}</option>`;
@@ -248,11 +288,17 @@ async function testConnectionAndMaybeLoadModels({loadList=false} = {}){
 
         if(loadList){
             modelSelect.innerHTML = '';
-            if (data.models && data.models.length > 0) {
-                data.models.forEach(m=>{
+            let modelNames = [];
+            if (getProvider()==='ollama') {
+                modelNames = (data.models || []).map(m => m.name);
+            } else {
+                modelNames = (data.data || []).map(m => m.id);
+            }
+            if (modelNames.length > 0) {
+                modelNames.forEach(name=>{
                     const opt = document.createElement('option');
-                    opt.value = m.name;
-                    opt.textContent = m.name;
+                    opt.value = name;
+                    opt.textContent = name;
                     modelSelect.appendChild(opt);
                 });
                 const remembered = localStorage.getItem('selectedModel');
@@ -285,10 +331,13 @@ async function testConnectionAndMaybeLoadModels({loadList=false} = {}){
 // ===== 載入記憶設定 + 首次自動測試連線並載入模型 =====
 function loadSettings() {
     const savedUrl   = localStorage.getItem('ollamaUrl');
+    const savedProv  = localStorage.getItem('apiProvider');
     const savedModel = localStorage.getItem('selectedModel');
+    const savedStream = localStorage.getItem('streamMode');
     if (savedUrl) ollamaUrlInput.value = savedUrl;
+    if (savedProv && providerSelect) providerSelect.value = savedProv;
+    if (streamModeChk) streamModeChk.checked = savedStream === '1';
 
-    // 第一次載入：做一次連線測試 + 取得模型，並更新圖示
     testConnectionAndMaybeLoadModels({loadList:true}).then(ok=>{
         if(ok && savedModel && [...modelSelect.options].some(opt=>opt.value===savedModel)){
             modelSelect.value = savedModel;
@@ -299,11 +348,15 @@ function loadSettings() {
 // 儲存設定
 function saveSettings() {
     localStorage.setItem('ollamaUrl', ollamaUrlInput.value.trim());
+    if(providerSelect) localStorage.setItem('apiProvider', providerSelect.value);
     localStorage.setItem('selectedModel', modelSelect.value);
+    if(streamModeChk) localStorage.setItem('streamMode', streamModeChk.checked ? '1' : '0');
 }
 
 // 事件：API 網址改變時儲存
 ollamaUrlInput.addEventListener('change', saveSettings);
+if(providerSelect){ providerSelect.addEventListener('change', async ()=>{ saveSettings(); await testConnectionAndMaybeLoadModels({loadList:true}); }); }
+if(streamModeChk){ streamModeChk.addEventListener('change', saveSettings); }
 
 // 手動「驗證連線」→ 測試並載入模型 + 更新兩處狀態（面板與按鈕圖示）
 validateBtn.addEventListener('click', async () => {
@@ -344,9 +397,12 @@ async function translateText() {
     const input  = document.getElementById('input-text').value;
     const source = document.getElementById('source-lang').value;
     const target = document.getElementById('target-lang').value;
-    const base   = ollamaUrlInput.value.trim().replace(/\/+$/, '');
-    const ollamaUrl = base + '/api/generate';
     const selectedModel = modelSelect.value;
+
+    if (currentAbortController) {
+        if (confirm(t.confirmInterrupt)) currentAbortController.abort();
+        return;
+    }
 
     if (!input) { alert(t.inputRequired); return; }
     if (!selectedModel) {
@@ -368,28 +424,91 @@ async function translateText() {
 
     const prompt = `Translate the following text from ${sourceName} to ${targetName}: ${input}. Output ONLY the translated text with no explanations, no quotes, no markdown fences.`;
 
-    const payload = {
-        model: selectedModel,
-        prompt: prompt,
-        stream: false
-    };
+    const stream = !!(streamModeChk && streamModeChk.checked);
+    let payload;
+    if(getProvider()==='ollama'){
+        payload = { model: selectedModel, prompt: prompt, stream: stream };
+    }else{
+        payload = { model: selectedModel, messages: [{ role: 'user', content: prompt }], stream: stream };
+    }
+
+    currentAbortController = new AbortController();
+    const signal = currentAbortController.signal;
+    setButtonTranslating(true);
+    const chatUrl = getChatEndpoint();
+    const outEl = document.getElementById('output-text');
+    outEl.value = '';
 
     try {
-        const response = await fetch(ollamaUrl, {
+        const resp = await fetch(chatUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(payload),
+            signal
         });
-        const data = await response.json();
-
-        if (data && typeof data.response === 'string') {
-            const cleaned = stripHiddenReasoning(data.response);
-            document.getElementById('output-text').value = cleaned || '';
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        if (!stream) {
+            const data = await resp.json();
+            const raw = extractResponse(data, getProvider());
+            if (raw) {
+                outEl.value = stripHiddenReasoning(raw);
+            } else {
+                outEl.value = t.translationFailed + JSON.stringify(data);
+            }
         } else {
-            document.getElementById('output-text').value = t.translationFailed + JSON.stringify(data);
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder();
+            let buf = '';
+            const prov = getProvider();
+            signal.addEventListener('abort', () => { reader.cancel().catch(()=>{}); });
+            try {
+                while (true) {
+                    const {done, value} = await reader.read();
+                    if (done) break;
+                    buf += decoder.decode(value, {stream: true});
+                    if (prov === 'ollama') {
+                        let lines = buf.split('\n');
+                        buf = lines.pop() || '';
+                        for (const line of lines) {
+                            if (line.trim() === '') continue;
+                            try {
+                                const j = JSON.parse(line);
+                                if (typeof j.response === 'string') outEl.value += j.response;
+                            } catch (e) {}
+                        }
+                    } else {
+                        let events = buf.split('\n\n');
+                        buf = events.pop() || '';
+                        for (const ev of events) {
+                            const lines = ev.split('\n');
+                            for (const line of lines) {
+                                if (line.startsWith('data: ')) {
+                                    const dataStr = line.substring(6).trim();
+                                    if (dataStr === '[DONE]') continue;
+                                    try {
+                                        const j = JSON.parse(dataStr);
+                                        const delta = j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content;
+                                        if (typeof delta === 'string') outEl.value += delta;
+                                    } catch (e) {}
+                                }
+                            }
+                        }
+                    }
+                }
+            } finally {
+                outEl.value = stripHiddenReasoning(outEl.value);
+            }
         }
     } catch (error) {
-        document.getElementById('output-text').value = t.error + error.message;
+        const outEl2 = document.getElementById('output-text');
+        if (error.name === 'AbortError') {
+            outEl2.value = stripHiddenReasoning(outEl2.value || '') + t.aborted;
+        } else {
+            outEl2.value = t.error + error.message;
+        }
+    } finally {
+        currentAbortController = null;
+        setButtonTranslating(false);
     }
 }
 translateBtn.addEventListener('click', translateText);

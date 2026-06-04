@@ -111,9 +111,11 @@ body{
 .mid{
     grid-area: mid;
     display:flex;
+    flex-direction:column;
     align-items:center;
     justify-content:center;
-    min-width: 120px; /* 給按鈕舒適寬度 */
+    min-width: 120px;
+    gap:6px;
 }
 .translate-btn{
     background:var(--brand);
@@ -127,6 +129,19 @@ body{
     white-space:nowrap;
 }
 .translate-btn:hover{ background:var(--brand-hover) }
+.translate-btn.interrupt{
+    background:#c53030;
+    box-shadow:0 10px 24px rgba(197,48,48,.3);
+}
+.translate-btn.interrupt:hover{ background:#9b2c2c }
+.stream-label{
+    font-size:12px;
+    color:var(--muted);
+    display:flex;
+    align-items:center;
+    gap:4px;
+    white-space:nowrap;
+}
 
 /* ========== 懸浮式設定面板 ========== */
 .settings-toggle{

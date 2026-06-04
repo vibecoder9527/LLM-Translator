@@ -9,7 +9,7 @@
 <body>
 
     <!-- 懸浮設定切換鈕（左側圖示顯示測試結果） -->
-    <button id="settings-toggle" class="settings-toggle" aria-expanded="false" aria-controls="settings-panel" title="開啟/關閉設定（Ollama 網址與模型）">
+    <button id="settings-toggle" class="settings-toggle" aria-expanded="false" aria-controls="settings-panel" title="開啟/關閉設定（API 網址與模型）">
         <span id="settings-indicator" class="settings-indicator" aria-hidden="true">⏳</span>
         <span id="settings-label">⚙️ 設定</span>
     </button>
@@ -32,7 +32,17 @@
             </div>
 
             <div class="settings-row">
-                <label for="ollama-url">Ollama API 網址（範例： http://localhost:11434 ）</label>
+                <label for="provider" id="provider-label">API 提供者</label>
+                <div class="model-group">
+                    <select id="provider">
+                        <option value="ollama">Ollama（原生）</option>
+                        <option value="openai">OpenAI 相容</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="settings-row">
+                <label for="ollama-url" id="api-url-label">API Base URL（Ollama 範例：http://localhost:11434；OpenAI 範例：http://localhost:1234/v1）</label>
                 <div class="url-group">
                     <input type="text" id="ollama-url" value="http://localhost:11434" inputmode="url" placeholder="http://localhost:11434"/>
                     <button id="validate-btn" type="button">驗證連線</button>
@@ -85,6 +95,7 @@
             <!-- 中間置中按鈕 -->
             <div class="mid">
                 <button class="translate-btn" id="translate-btn" title="執行翻譯">翻譯</button>
+                <label class="stream-label"><input type="checkbox" id="stream-mode"/><span id="stream-label-text">串流輸出</span></label>
             </div>
 
             <section class="pane output">
