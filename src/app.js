@@ -222,7 +222,26 @@ function stripHiddenReasoning(text) {
     text = text.replace(/<\s*think[^>]*>[\s\S]*?<\s*\/\s*think\s*>/gi, '');
     text = text.replace(/<\s*thinking[^>]*>[\s\S]*?<\s*\/\s*thinking\s*\s*>/gi, '');
     text = text.replace(/<\|\s*think\s*\|>[\s\S]*?<\|\s*\/\s*think\s*\|>/gi, '');
-    return text.trim();
+    return text;
+}
+
+// Preserve exact leading/trailing newline count from input (belt-and-suspenders for model normalization)
+function preserveWhitespace(input, output) {
+    if (!output) return output;
+    let result = output;
+
+    const inLeadNL = (input.match(/^\n+/) || [''])[0].length;
+    const outLeadNL = (result.match(/^\n+/) || [''])[0].length;
+    if (inLeadNL > outLeadNL) {
+        result = '\n'.repeat(inLeadNL - outLeadNL) + result;
+    }
+
+    const inTrailNL = (input.match(/\n+$/) || [''])[0].length;
+    const outTrailNL = (result.match(/\n+$/) || [''])[0].length;
+    if (inTrailNL > outTrailNL) {
+        result = result + '\n'.repeat(inTrailNL - outTrailNL);
+    }
+    return result;
 }
 
 function getProvider(){ return (providerSelect && providerSelect.value) || 'ollama'; }
@@ -422,7 +441,15 @@ async function translateText() {
     const sourceName = langMap[source] || 'auto-detect';
     const targetName = langMap[target] || 'English';
 
-    const prompt = `Translate the following text from ${sourceName} to ${targetName}: ${input}. Output ONLY the translated text with no explanations, no quotes, no markdown fences.`;
+    const prompt = `Translate the text between the <SOURCE> and </SOURCE> markers from ${sourceName} to ${targetName}.
+
+CRITICAL RULES — WHITESPACE MUST BE 100% PRESERVED:
+- Copy the source text's whitespace EXACTLY: every newline (including blank lines), every leading space/tab on every line, every trailing space, and all internal indentation.
+- Do NOT add, remove, trim, collapse, or normalize ANY whitespace or line breaks anywhere.
+- The output must have the IDENTICAL sequence of \n and spaces as the source (only the characters are translated).
+- Output ONLY the translated text. Nothing else: no explanations, no quotes, no markdown, no extra lines before or after.
+
+<SOURCE>${input}</SOURCE>`;
 
     const stream = !!(streamModeChk && streamModeChk.checked);
     let payload;
@@ -451,7 +478,7 @@ async function translateText() {
             const data = await resp.json();
             const raw = extractResponse(data, getProvider());
             if (raw) {
-                outEl.value = stripHiddenReasoning(raw);
+                outEl.value = preserveWhitespace(input, stripHiddenReasoning(raw));
             } else {
                 outEl.value = t.translationFailed + JSON.stringify(data);
             }
@@ -470,7 +497,7 @@ async function translateText() {
                         let lines = buf.split('\n');
                         buf = lines.pop() || '';
                         for (const line of lines) {
-                            if (line.trim() === '') continue;
+                            if (line.length === 0) continue;
                             try {
                                 const j = JSON.parse(line);
                                 if (typeof j.response === 'string') outEl.value += j.response;
@@ -496,7 +523,7 @@ async function translateText() {
                     }
                 }
             } finally {
-                outEl.value = stripHiddenReasoning(outEl.value);
+                outEl.value = preserveWhitespace(input, stripHiddenReasoning(outEl.value));
             }
         }
     } catch (error) {
